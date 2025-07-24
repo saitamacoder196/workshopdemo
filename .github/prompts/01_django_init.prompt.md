@@ -271,7 +271,6 @@ def api_root(request):
         'endpoints': {
             'health': '/api/health/',
             'swagger': '/api/swagger/',
-            'redoc': '/api/redoc/',
             'admin': '/admin/'
         }
     })
@@ -308,7 +307,6 @@ urlpatterns = [
     
     # Swagger documentation
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     path('swagger.json', schema_view.without_ui(cache_timeout=0), name='schema-json'),
 ]
 ```
@@ -347,7 +345,6 @@ python manage.py runserver
 - ✅ **API Root**: http://127.0.0.1:8000/api/
 - ✅ **Health Check**: http://127.0.0.1:8000/api/health/
 - ✅ **Swagger UI**: http://127.0.0.1:8000/api/swagger/
-- ✅ **ReDoc**: http://127.0.0.1:8000/api/redoc/
 - ✅ **Admin Panel**: http://127.0.0.1:8000/admin/
 
 **Expected Health Check Response:**
@@ -366,7 +363,6 @@ python manage.py runserver
     "endpoints": {
         "health": "/api/health/",
         "swagger": "/api/swagger/",
-        "redoc": "/api/redoc/",
         "admin": "/admin/"
     }
 }
@@ -404,7 +400,6 @@ Your simple Django project is now running with:
 - ✅ Minimal structure (only essential files)
 - ✅ Working health check endpoint
 - ✅ Swagger UI documentation at `/api/swagger/`
-- ✅ ReDoc documentation at `/api/redoc/`
 - ✅ Admin panel ready
 - ✅ SQLite database (no external DB needed)
 - ✅ Environment variables support
