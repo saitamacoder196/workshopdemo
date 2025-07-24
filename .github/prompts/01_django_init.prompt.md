@@ -10,6 +10,7 @@ This prompt creates a minimal Django REST Framework project with only essential 
 
 **Project Details:**
 - 📦 Project Name: `${input:project_name}`
+- 🏷️ Main App: `${input:main_app}`
 - 🗄️ Database: SQLite (default)
 
 ## Instructions
@@ -33,7 +34,14 @@ ${input:project_name}/
 │   ├── wsgi.py
 │   └── asgi.py
 └── apps/
-    └── api/
+    └── health/
+        ├── __init__.py
+        ├── apps.py
+        ├── views.py
+        ├── urls.py
+        └── migrations/
+            └── __init__.py
+    └── ${input:main_app}/
         ├── __init__.py
         ├── apps.py
         ├── views.py
@@ -101,9 +109,10 @@ pip install -r requirements.txt
 # Create Django project
 django-admin startproject ${input:project_name} .
 
-# Create api app in apps folder
-mkdir -p apps/api
-python manage.py startapp api apps/api
+# Create health and main apps in apps folder
+mkdir -p apps/health apps/${input:main_app}
+python manage.py startapp health apps/health
+python manage.py startapp ${input:main_app} apps/${input:main_app}
 ```
 
 ### 4. Configure Django Settings
@@ -140,7 +149,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_yasg',
     # Local apps
-    'apps.api',
+    'apps.health',
+    'apps.${input:main_app}'
 ]
 
 MIDDLEWARE = [
@@ -220,7 +230,7 @@ REST_FRAMEWORK = {
 
 ### 5. Create API Views and URLs
 
-#### apps/api/views.py
+#### apps/health/views.py
 ```python
 """
 Simple API views with health check endpoint and Swagger documentation.
@@ -276,7 +286,7 @@ def api_root(request):
     })
 ```
 
-#### apps/api/urls.py
+#### apps/health/urls.py
 ```python
 """
 API URL configuration with Swagger documentation.
@@ -321,7 +331,8 @@ from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include('apps.api.urls')),
+    path('api/', include('apps.health.urls')),
+    path('api/${input:main_app}/', include('apps.${input:main_app}.urls')),
 ]
 ```
 
@@ -342,9 +353,9 @@ python manage.py runserver
 
 **Test these URLs in your browser:**
 
-- ✅ **API Root**: http://127.0.0.1:8000/api/
-- ✅ **Health Check**: http://127.0.0.1:8000/api/health/
-- ✅ **Swagger UI**: http://127.0.0.1:8000/api/swagger/
+- ✅ **API Root**: http://127.0.0.1:8000/api/health/
+- ✅ **Health Check**: http://127.0.0.1:8000/api/health/health/
+- ✅ **Swagger UI**: http://127.0.0.1:8000/api/health/swagger/
 - ✅ **Admin Panel**: http://127.0.0.1:8000/admin/
 
 **Expected Health Check Response:**
@@ -367,6 +378,49 @@ python manage.py runserver
     }
 }
 ```
+
+
+## Developer Start Guideline
+
+Follow these steps to start and verify your Django project:
+
+1. **Navigate to the project directory:**
+    ```bash
+    cd ${input:project_name}
+    ```
+
+2. **Activate the virtual environment:**
+    - **Linux/macOS:**
+      ```bash
+      source venv/bin/activate
+      ```
+    - **Windows:**
+      ```bash
+      venv\Scripts\activate
+      ```
+
+3. **Apply database migrations:**
+    ```bash
+    python manage.py migrate
+    ```
+
+4. **(Optional) Create a superuser:**
+    ```bash
+    python manage.py createsuperuser
+    ```
+
+5. **Run the development server:**
+    ```bash
+    python manage.py runserver
+    ```
+
+6. **Verify the application by visiting these URLs in your browser:**
+    - API Root: [http://127.0.0.1:8000/api/health/](http://127.0.0.1:8000/api/health/)
+    - Health Check: [http://127.0.0.1:8000/api/health/health/](http://127.0.0.1:8000/api/health/health/)
+    - Swagger UI: [http://127.0.0.1:8000/api/health/swagger/](http://127.0.0.1:8000/api/health/swagger/)
+    - Admin Panel: [http://127.0.0.1:8000/admin/](http://127.0.0.1:8000/admin/)
+
+If you see the expected responses, your setup is correct!
 
 ## Common Issues and Quick Fixes
 
