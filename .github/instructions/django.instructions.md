@@ -20,6 +20,105 @@ applyTo: "**/*.py"
 - Use Django's built-in features before creating custom solutions
 - Apply MTV (Model-Template-View) pattern correctly
 
+## Naming Conventions
+
+### Django Project Naming Rules
+- Use lowercase letters only for project names
+- Use underscores (_) to separate words, not hyphens
+- Avoid Python reserved keywords and Django built-in names
+- Keep names short, descriptive, and memorable
+- Examples: `blog_platform`, `ecommerce_api`, `task_manager`
+
+### Django App Naming Rules
+- Use lowercase letters only for app names
+- Use underscores (_) for multi-word app names
+- Choose singular nouns over plural (e.g., `user` not `users`)
+- Keep app names short and focused on a single concern
+- Avoid generic names like `utils`, `helpers`, `common`
+- Use descriptive names that clearly indicate the app's purpose
+- Examples: `authentication`, `blog`, `payment`, `notification`
+
+### Model Naming
+- Use PascalCase (CapWords) for model names
+- Use singular nouns (e.g., `User` not `Users`)
+- Be descriptive but concise
+- Examples: `BlogPost`, `UserProfile`, `OrderItem`
+
+### Field Naming
+- Use lowercase with underscores (snake_case)
+- Avoid redundant prefixes (e.g., `user_email` in User model)
+- Use clear, descriptive names
+- Boolean fields should start with `is_` or `has_`
+- Examples: `created_at`, `is_active`, `has_verified_email`
+
+### URL Pattern Naming
+- Use lowercase with hyphens for URL paths
+- Use underscores for URL pattern names
+- Keep URLs RESTful and resource-oriented
+- Examples:
+  ```python
+  path('api/v1/blog-posts/', views.BlogPostList.as_view(), name='blog_post_list')
+  path('api/v1/blog-posts/<int:pk>/', views.BlogPostDetail.as_view(), name='blog_post_detail')
+  ```
+
+### View and ViewSet Naming
+- Use PascalCase for class-based views
+- End ViewSet names with `ViewSet`
+- End API views with `View` or `APIView`
+- Be specific about the action
+- Examples: `UserViewSet`, `BlogPostListView`, `OrderCreateAPIView`
+
+### Serializer Naming
+- Use PascalCase ending with `Serializer`
+- Match the model name when possible
+- Use descriptive prefixes for variants
+- Examples: `UserSerializer`, `UserDetailSerializer`, `UserCreateSerializer`
+
+### File and Module Naming
+- Use lowercase with underscores for Python files
+- Group related functionality together
+- Standard Django file names: `models.py`, `views.py`, `serializers.py`
+- Custom modules: `validators.py`, `permissions.py`, `filters.py`
+
+### Test Naming
+- Test files should start with `test_`
+- Test classes should start with `Test`
+- Test methods should start with `test_`
+- Be descriptive about what's being tested
+- Examples:
+  ```python
+  # test_models.py
+  class TestUserModel:
+      def test_user_creation_with_valid_data(self):
+          pass
+      
+      def test_user_str_representation(self):
+          pass
+  ```
+
+### Template and Static File Naming
+- Use lowercase with hyphens for template files
+- Organize templates by app: `templates/<app_name>/`
+- Use descriptive names: `user-profile.html`, `blog-list.html`
+- Static files follow similar conventions: `static/<app_name>/`
+
+### Management Command Naming
+- Use lowercase with underscores
+- Use verb-noun format when possible
+- Examples: `create_sample_data`, `clean_expired_tokens`, `send_notifications`
+
+### Settings and Configuration
+- Use UPPERCASE for Django settings
+- Group related settings with common prefixes
+- Examples: `DATABASE_NAME`, `CACHE_TTL`, `EMAIL_BACKEND`
+
+### Common Anti-patterns to Avoid
+- Don't use camelCase for Python modules or functions
+- Avoid abbreviations that aren't widely understood
+- Don't use special characters in names
+- Avoid overly generic names like `data`, `info`, `manager`
+- Don't shadow Python built-ins or Django internals
+
 ## Models & Database
 
 ### Model Design

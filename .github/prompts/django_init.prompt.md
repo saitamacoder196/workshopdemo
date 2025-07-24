@@ -25,15 +25,6 @@ Create the following directory structure for `${input:project_name}`:
 
 ```
 ${input:project_name}/
-├── .github/
-│   ├── workflows/
-│   │   ├── ci.yml
-│   │   └── deploy.yml
-│   └── instructions/
-│       ├── copilot.instructions.md
-│       ├── django.instructions.md
-│       ├── python.instructions.md
-│       └── testing.instructions.md
 ├── apps/
 │   ├── core/
 │   ├── authentication/
@@ -76,7 +67,39 @@ ${input:project_name}/
 Create the following essential configuration files:
 
 #### pyproject.toml
-Reference: file:python.instructions.md for proper Python project configuration
+```toml
+[tool.poetry]
+name = "${input:project_name}"
+version = "0.1.0"
+description = "A production-ready Django REST Framework project"
+authors = ["Your Name <your.email@example.com>"]
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+line_length = 88
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+plugins = ["mypy_django_plugin.main"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.testing"
+python_files = ["test_*.py", "*_test.py", "testing/python/*.py"]
+addopts = "-v --tb=short --strict-markers --cov=apps --cov-report=term-missing"
+```
 
 #### requirements/base.txt
 ```
@@ -88,6 +111,7 @@ django-filter>=22.1
 drf-yasg>=1.21.0
 python-decouple>=3.8
 redis>=4.5.0
+gunicorn>=20.1.0
 ```
 
 Add database-specific requirements based on `${input:database_type}`:
@@ -113,6 +137,8 @@ isort>=5.10.0
 flake8>=5.0.0
 mypy>=0.991
 django-debug-toolbar>=4.0.0
+ipython>=8.0.0
+django-extensions>=3.2.0
 ```
 
 ### 3. Django Project Initialization
@@ -139,147 +165,1759 @@ python manage.py startapp ${input:app_name} apps/${input:app_name}
 
 ### 4. Settings Configuration
 
-Configure Django settings following file:django.instructions.md patterns:
-
 #### config/settings/base.py
-- Include all required Django and DRF settings
-- Configure database for `${input:database_type}`
-- Set up JWT authentication
-- Configure CORS settings
-- Add drf-yasg for API documentation
-- Include Celery configuration if `${input:include_celery}` is true
+```python
+"""
+Base settings for ${input:project_name} project.
+For more information on this file, see
+https://docs.djangoproject.com/en/4.2/topics/settings/
+"""
+import os
+from pathlib import Path
+from datetime import timedelta
+from decouple import config, Csv
+
+# Build paths inside the project
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+# Security
+SECRET_KEY = config('SECRET_KEY')
+DEBUG = False
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())
+
+# Application definition
+DJANGO_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+]
+
+THIRD_PARTY_APPS = [
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'django_filters',
+    'corsheaders',
+    'drf_yasg',
+]
+
+LOCAL_APPS = [
+    'apps.core',
+    'apps.authentication',
+    'apps.api',
+    'apps.${input:app_name}',
+]
+
+INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
+
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'apps.core.middleware.RequestLoggingMiddleware',
+]
+
+ROOT_URLCONF = 'config.urls'
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [BASE_DIR / 'templates'],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = 'config.wsgi.application'
+
+# Database configuration based on ${input:database_type}
+if '${input:database_type}' == 'postgresql':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME'),
+            'USER': config('DB_USER'),
+            'PASSWORD': config('DB_PASSWORD'),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+        }
+    }
+elif '${input:database_type}' == 'mysql':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': config('DB_NAME'),
+            'USER': config('DB_USER'),
+            'PASSWORD': config('DB_PASSWORD'),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='3306'),
+        }
+    }
+else:  # sqlite
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+
+# Password validation
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {
+            'min_length': 8,
+        }
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+]
+
+# Internationalization
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = 'UTC'
+USE_I18N = True
+USE_TZ = True
+
+# Static files
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [BASE_DIR / 'static']
+
+# Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Default primary key field type
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# REST Framework configuration
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+    ],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.MultiPartParser',
+    ],
+    'EXCEPTION_HANDLER': 'apps.core.exceptions.custom_exception_handler',
+}
+
+# JWT Configuration
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': config('JWT_SECRET_KEY', default=SECRET_KEY),
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+}
+
+# CORS Configuration
+CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', cast=Csv(), default='')
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', cast=bool, default=False)
+CORS_ALLOW_CREDENTIALS = True
+
+# Celery Configuration (if ${input:include_celery} is true)
+if ${input:include_celery}:
+    CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:6379/0')
+    CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='redis://localhost:6379/0')
+    CELERY_ACCEPT_CONTENT = ['json']
+    CELERY_TASK_SERIALIZER = 'json'
+    CELERY_RESULT_SERIALIZER = 'json'
+    CELERY_TIMEZONE = TIME_ZONE
+
+# Logging Configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': config('LOG_LEVEL', default='INFO'),
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': config('DJANGO_LOG_LEVEL', default='INFO'),
+            'propagate': False,
+        },
+    },
+}
+```
 
 #### config/settings/development.py
-- Enable DEBUG mode
-- Configure Django Debug Toolbar
-- Set development-specific database settings
+```python
+"""Development settings for ${input:project_name} project."""
+from .base import *
+
+DEBUG = True
+
+ALLOWED_HOSTS = ['*']
+
+# Django Debug Toolbar
+INSTALLED_APPS += ['debug_toolbar']
+MIDDLEWARE = ['debug_toolbar.middleware.DebugToolbarMiddleware'] + MIDDLEWARE
+
+INTERNAL_IPS = ['127.0.0.1']
+
+# Email backend for development
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# Disable password validators in development
+AUTH_PASSWORD_VALIDATORS = []
+
+# CORS - Allow all origins in development
+CORS_ALLOW_ALL_ORIGINS = True
+```
 
 #### config/settings/production.py
-- Security settings for production
-- Configure static files handling
-- Set production database settings
-- Configure logging
+```python
+"""Production settings for ${input:project_name} project."""
+from .base import *
+
+DEBUG = False
+
+# Security settings
+SECURE_SSL_REDIRECT = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+
+# HSTS settings
+SECURE_HSTS_SECONDS = 31536000  # 1 year
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+```
 
 ### 5. Core Django Apps Setup
 
-#### apps/core/
-Create base models, utilities, and shared components:
-- BaseModel with created_at, updated_at, is_active fields
-- Custom model managers
-- Utility functions
-- Common exceptions
+#### apps/core/__init__.py
+```python
+"""
+Core app containing base models, utilities, exceptions, and middlewares.
+This app provides common functionality used across the entire project.
+"""
+```
 
-#### apps/authentication/
-Set up user authentication:
-- Custom User model (if needed)
-- JWT authentication views
-- User serializers
-- Permission classes
+#### apps/core/models.py
+```python
+"""
+Base models and model utilities for the project.
+Provides abstract base models with common fields and behaviors.
+"""
+from django.db import models
+from django.utils import timezone
 
-#### apps/api/
-Configure API routing and versioning:
-- Root URL configuration
-- API versioning setup
-- OpenAPI documentation setup
 
-#### apps/${input:app_name}/
-Create main application:
-- Models for business logic
-- Serializers for API
-- ViewSets and views
-- URL routing
-- Permissions
+class BaseModel(models.Model):
+    """
+    Abstract base model with common fields for all models.
+    Provides created_at, updated_at timestamps and soft delete functionality.
+    """
+    created_at = models.DateTimeField(
+        default=timezone.now,
+        help_text="Timestamp when the record was created"
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        help_text="Timestamp when the record was last updated"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Flag to indicate if the record is active (soft delete)"
+    )
+    
+    class Meta:
+        abstract = True
+        ordering = ['-created_at']
+    
+    def soft_delete(self):
+        """Soft delete the record by setting is_active to False."""
+        self.is_active = False
+        self.save(update_fields=['is_active', 'updated_at'])
+    
+    def restore(self):
+        """Restore a soft deleted record."""
+        self.is_active = True
+        self.save(update_fields=['is_active', 'updated_at'])
+
+
+class ActiveManager(models.Manager):
+    """Manager that returns only active records."""
+    
+    def get_queryset(self):
+        """Return only active records."""
+        return super().get_queryset().filter(is_active=True)
+
+
+class TimestampedModel(models.Model):
+    """
+    Abstract model with only timestamp fields.
+    Use when you need timestamps but not soft delete functionality.
+    """
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        abstract = True
+        ordering = ['-created_at']
+```
+
+#### apps/core/exceptions.py
+```python
+"""
+Custom exceptions and exception handlers for the project.
+Provides consistent error response format across the API.
+"""
+from rest_framework.views import exception_handler
+from rest_framework.response import Response
+from rest_framework import status
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.http import Http404
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class BaseAPIException(Exception):
+    """Base exception class for API custom exceptions."""
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    default_detail = 'A server error occurred.'
+    default_code = 'error'
+    
+    def __init__(self, detail=None, code=None):
+        if detail is None:
+            detail = self.default_detail
+        if code is None:
+            code = self.default_code
+        
+        self.detail = detail
+        self.code = code
+
+
+class NotFoundError(BaseAPIException):
+    """Exception for resource not found errors."""
+    status_code = status.HTTP_404_NOT_FOUND
+    default_detail = 'Resource not found.'
+    default_code = 'not_found'
+
+
+class ValidationError(BaseAPIException):
+    """Exception for validation errors."""
+    status_code = status.HTTP_400_BAD_REQUEST
+    default_detail = 'Invalid input.'
+    default_code = 'validation_error'
+
+
+class AuthenticationError(BaseAPIException):
+    """Exception for authentication errors."""
+    status_code = status.HTTP_401_UNAUTHORIZED
+    default_detail = 'Authentication credentials were not provided or are invalid.'
+    default_code = 'authentication_error'
+
+
+class PermissionError(BaseAPIException):
+    """Exception for permission errors."""
+    status_code = status.HTTP_403_FORBIDDEN
+    default_detail = 'You do not have permission to perform this action.'
+    default_code = 'permission_denied'
+
+
+class ConflictError(BaseAPIException):
+    """Exception for conflict errors (e.g., duplicate resources)."""
+    status_code = status.HTTP_409_CONFLICT
+    default_detail = 'Request conflicts with current state.'
+    default_code = 'conflict'
+
+
+def custom_exception_handler(exc, context):
+    """
+    Custom exception handler that provides consistent error responses.
+    Returns error responses in the format:
+    {
+        "success": false,
+        "error": {
+            "code": "error_code",
+            "message": "Error message",
+            "details": {...}  // Optional additional details
+        }
+    }
+    """
+    # Call REST framework's default exception handler first
+    response = exception_handler(exc, context)
+    
+    # Handle Django 404
+    if isinstance(exc, Http404):
+        exc = NotFoundError()
+    
+    # Handle Django ValidationError
+    elif isinstance(exc, DjangoValidationError):
+        exc = ValidationError(detail=str(exc))
+    
+    # Handle custom API exceptions
+    if isinstance(exc, BaseAPIException):
+        logger.error(f"API Exception: {exc.code} - {exc.detail}")
+        
+        error_response = {
+            'success': False,
+            'error': {
+                'code': exc.code,
+                'message': exc.detail,
+            }
+        }
+        
+        return Response(error_response, status=exc.status_code)
+    
+    # Format DRF exceptions
+    if response is not None:
+        error_response = {
+            'success': False,
+            'error': {
+                'code': getattr(exc, 'default_code', 'error'),
+                'message': 'An error occurred',
+                'details': response.data
+            }
+        }
+        response.data = error_response
+    
+    return response
+```
+
+#### apps/core/middleware.py
+```python
+"""
+Custom middleware for the project.
+Provides request/response processing and logging functionality.
+"""
+import time
+import json
+import logging
+from django.utils.deprecation import MiddlewareMixin
+from django.http import JsonResponse
+
+logger = logging.getLogger(__name__)
+
+
+class RequestLoggingMiddleware(MiddlewareMixin):
+    """
+    Middleware to log all incoming requests and outgoing responses.
+    Logs request method, path, response status, and response time.
+    """
+    
+    def process_request(self, request):
+        """Log incoming request and start timing."""
+        request._start_time = time.time()
+        
+        logger.info(
+            f"Request: {request.method} {request.path} "
+            f"from {self.get_client_ip(request)}"
+        )
+        
+        return None
+    
+    def process_response(self, request, response):
+        """Log response details and timing."""
+        if hasattr(request, '_start_time'):
+            duration = time.time() - request._start_time
+            
+            logger.info(
+                f"Response: {request.method} {request.path} "
+                f"Status: {response.status_code} "
+                f"Duration: {duration:.3f}s"
+            )
+        
+        return response
+    
+    def get_client_ip(self, request):
+        """Get the client's IP address from the request."""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+
+
+class JSONParsingMiddleware(MiddlewareMixin):
+    """
+    Middleware to handle JSON parsing errors gracefully.
+    Returns a properly formatted error response for invalid JSON.
+    """
+    
+    def process_exception(self, request, exception):
+        """Handle JSON parsing exceptions."""
+        if isinstance(exception, json.JSONDecodeError):
+            return JsonResponse({
+                'success': False,
+                'error': {
+                    'code': 'invalid_json',
+                    'message': 'Invalid JSON in request body',
+                    'details': str(exception)
+                }
+            }, status=400)
+        
+        return None
+
+
+class HealthCheckMiddleware(MiddlewareMixin):
+    """
+    Middleware to handle health check requests.
+    Provides a simple health check endpoint that bypasses authentication.
+    """
+    
+    def process_request(self, request):
+        """Check if this is a health check request."""
+        if request.path == '/api/v1/health/':
+            return JsonResponse({
+                'success': True,
+                'status': 'healthy',
+                'service': '${input:project_name}'
+            })
+        
+        return None
+```
+
+#### apps/core/permissions.py
+```python
+"""
+Custom permission classes for the project.
+Provides fine-grained access control for API endpoints.
+"""
+from rest_framework import permissions
+
+
+class IsOwnerOrReadOnly(permissions.BasePermission):
+    """
+    Custom permission to only allow owners of an object to edit it.
+    Assumes the model has an 'owner' or 'user' field.
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        # Read permissions are allowed to any request
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        
+        # Write permissions are only allowed to the owner
+        return obj.owner == request.user or obj.user == request.user
+
+
+class IsOwner(permissions.BasePermission):
+    """
+    Custom permission to only allow owners of an object to view or edit it.
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        return obj.owner == request.user or obj.user == request.user
+
+
+class IsSuperUser(permissions.BasePermission):
+    """
+    Custom permission to only allow superusers.
+    """
+    
+    def has_permission(self, request, view):
+        return request.user and request.user.is_superuser
+
+
+class IsStaffOrReadOnly(permissions.BasePermission):
+    """
+    Custom permission to allow staff users to edit, others read-only.
+    """
+    
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return request.user and request.user.is_staff
+```
+
+#### apps/core/utils.py
+```python
+"""
+Utility functions and helpers for the project.
+Provides common functionality used across different apps.
+"""
+import string
+import random
+from django.utils.text import slugify
+
+
+def generate_unique_code(length=6):
+    """
+    Generate a unique alphanumeric code.
+    
+    Args:
+        length (int): Length of the code to generate
+    
+    Returns:
+        str: Unique alphanumeric code
+    """
+    characters = string.ascii_uppercase + string.digits
+    return ''.join(random.choice(characters) for _ in range(length))
+
+
+def generate_unique_slug(text, model_class, slug_field='slug'):
+    """
+    Generate a unique slug for a model instance.
+    
+    Args:
+        text (str): Text to create slug from
+        model_class: Django model class to check uniqueness against
+        slug_field (str): Name of the slug field in the model
+    
+    Returns:
+        str: Unique slug
+    """
+    slug = slugify(text)
+    unique_slug = slug
+    num = 1
+    
+    while model_class.objects.filter(**{slug_field: unique_slug}).exists():
+        unique_slug = f'{slug}-{num}'
+        num += 1
+    
+    return unique_slug
+
+
+def get_client_ip(request):
+    """
+    Get the client's IP address from the request.
+    
+    Args:
+        request: Django request object
+    
+    Returns:
+        str: Client's IP address
+    """
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+
+
+class Choices:
+    """
+    Base class for creating choice constants.
+    
+    Example:
+        class StatusChoices(Choices):
+            PENDING = 'pending', 'Pending'
+            APPROVED = 'approved', 'Approved'
+            REJECTED = 'rejected', 'Rejected'
+    """
+    
+    @classmethod
+    def choices(cls):
+        """Return choices for Django model field."""
+        return [
+            (value, label)
+            for name, (value, label) in cls.__dict__.items()
+            if not name.startswith('_') and isinstance(value, tuple)
+        ]
+    
+    @classmethod
+    def values(cls):
+        """Return list of choice values."""
+        return [value for value, label in cls.choices()]
+    
+    @classmethod
+    def labels(cls):
+        """Return list of choice labels."""
+        return [label for value, label in cls.choices()]
+```
+
+#### apps/api/__init__.py
+```python
+"""
+API app for handling API routing, versioning, and documentation.
+This app serves as the main entry point for all API endpoints.
+"""
+```
+
+#### apps/api/urls.py
+```python
+"""
+Main API URL configuration.
+Includes versioning, documentation, and routing to other apps.
+"""
+from django.urls import path, include
+from rest_framework import permissions
+from drf_yasg.views import get_schema_view
+from drf_yasg import openapi
+from .views import HealthCheckView
+
+# API documentation schema
+schema_view = get_schema_view(
+    openapi.Info(
+        title="${input:project_name} API",
+        default_version='v1',
+        description="API documentation for ${input:project_name}",
+        terms_of_service="https://www.example.com/terms/",
+        contact=openapi.Contact(email="contact@example.com"),
+        license=openapi.License(name="BSD License"),
+    ),
+    public=True,
+    permission_classes=[permissions.AllowAny],
+)
+
+urlpatterns = [
+    # Health check endpoint
+    path('health/', HealthCheckView.as_view(), name='health-check'),
+    
+    # API documentation
+    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+    
+    # Authentication endpoints
+    path('auth/', include('apps.authentication.urls')),
+    
+    # Main app endpoints
+    path('${input:app_name}/', include('apps.${input:app_name}.urls')),
+]
+```
+
+#### apps/api/views.py
+```python
+"""
+API views for common endpoints.
+Provides health check and other utility endpoints.
+"""
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import AllowAny
+from django.db import connection
+from django.core.cache import cache
+import redis
+from django.conf import settings
+
+
+class HealthCheckView(APIView):
+    """
+    Health check endpoint for monitoring service health.
+    Returns the status of the service and its dependencies.
+    """
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        """
+        Check the health of the service and its dependencies.
+        
+        Returns:
+            Response: JSON response with health status
+        """
+        health_status = {
+            'success': True,
+            'status': 'healthy',
+            'service': '${input:project_name}',
+            'checks': {}
+        }
+        
+        # Check database connection
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+            health_status['checks']['database'] = 'healthy'
+        except Exception as e:
+            health_status['checks']['database'] = 'unhealthy'
+            health_status['status'] = 'unhealthy'
+            health_status['success'] = False
+        
+        # Check cache (Redis) connection
+        try:
+            cache.set('health_check', 'ok', 1)
+            if cache.get('health_check') == 'ok':
+                health_status['checks']['cache'] = 'healthy'
+            else:
+                raise Exception("Cache test failed")
+        except Exception as e:
+            health_status['checks']['cache'] = 'unhealthy'
+            health_status['status'] = 'degraded'
+        
+        # Check Redis directly if Celery is enabled
+        if hasattr(settings, 'CELERY_BROKER_URL') and settings.CELERY_BROKER_URL:
+            try:
+                redis_client = redis.from_url(settings.CELERY_BROKER_URL)
+                redis_client.ping()
+                health_status['checks']['redis'] = 'healthy'
+            except Exception as e:
+                health_status['checks']['redis'] = 'unhealthy'
+                health_status['status'] = 'degraded'
+        
+        status_code = status.HTTP_200_OK if health_status['success'] else status.HTTP_503_SERVICE_UNAVAILABLE
+        return Response(health_status, status=status_code)
+```
+
+#### apps/authentication/__init__.py
+```python
+"""
+Authentication app for handling user authentication and authorization.
+Provides JWT authentication, user management, and permission handling.
+"""
+```
+
+#### apps/authentication/models.py
+```python
+"""
+Authentication models.
+Extends Django's built-in User model if needed.
+"""
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+from apps.core.models import BaseModel
+
+
+# Uncomment and customize if you need a custom User model
+# class User(AbstractUser, BaseModel):
+#     """
+#     Custom User model with additional fields.
+#     """
+#     email = models.EmailField(unique=True)
+#     phone_number = models.CharField(max_length=20, blank=True)
+#     
+#     USERNAME_FIELD = 'email'
+#     REQUIRED_FIELDS = ['username']
+#     
+#     class Meta:
+#         db_table = 'users'
+#         verbose_name = 'User'
+#         verbose_name_plural = 'Users'
+```
+
+#### apps/authentication/serializers.py
+```python
+"""
+Authentication serializers for user registration, login, and profile management.
+"""
+from rest_framework import serializers
+from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+User = get_user_model()
+
+
+class UserSerializer(serializers.ModelSerializer):
+    """
+    Serializer for User model.
+    Used for user profile and listing.
+    """
+    
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'date_joined']
+        read_only_fields = ['id', 'date_joined']
+
+
+class UserRegistrationSerializer(serializers.ModelSerializer):
+    """
+    Serializer for user registration.
+    Validates password and creates new user.
+    """
+    password = serializers.CharField(
+        write_only=True,
+        required=True,
+        validators=[validate_password],
+        style={'input_type': 'password'}
+    )
+    password_confirm = serializers.CharField(
+        write_only=True,
+        required=True,
+        style={'input_type': 'password'}
+    )
+    
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'password', 'password_confirm', 'first_name', 'last_name']
+        extra_kwargs = {
+            'email': {'required': True},
+            'first_name': {'required': True},
+            'last_name': {'required': True},
+        }
+    
+    def validate(self, attrs):
+        """Validate that passwords match."""
+        if attrs['password'] != attrs['password_confirm']:
+            raise serializers.ValidationError({"password": "Password fields didn't match."})
+        return attrs
+    
+    def create(self, validated_data):
+        """Create new user with validated data."""
+        validated_data.pop('password_confirm')
+        user = User.objects.create_user(**validated_data)
+        return user
+
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """
+    Custom JWT token serializer that includes user info in response.
+    """
+    
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        
+        # Add custom user data to token response
+        data['user'] = {
+            'id': self.user.id,
+            'username': self.user.username,
+            'email': self.user.email,
+            'first_name': self.user.first_name,
+            'last_name': self.user.last_name,
+        }
+        
+        return data
+
+
+class PasswordChangeSerializer(serializers.Serializer):
+    """
+    Serializer for password change.
+    """
+    old_password = serializers.CharField(required=True, style={'input_type': 'password'})
+    new_password = serializers.CharField(
+        required=True,
+        validators=[validate_password],
+        style={'input_type': 'password'}
+    )
+    
+    def validate_old_password(self, value):
+        """Validate that old password is correct."""
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Old password is incorrect.")
+        return value
+```
+
+#### apps/authentication/views.py
+```python
+"""
+Authentication views for user registration, login, and profile management.
+"""
+from rest_framework import generics, status
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from django.contrib.auth import get_user_model
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .serializers import (
+    UserSerializer,
+    UserRegistrationSerializer,
+    CustomTokenObtainPairSerializer,
+    PasswordChangeSerializer
+)
+
+User = get_user_model()
+
+
+class UserRegistrationView(generics.CreateAPIView):
+    """
+    User registration endpoint.
+    Creates a new user account.
+    """
+    queryset = User.objects.all()
+    serializer_class = UserRegistrationSerializer
+    permission_classes = [AllowAny]
+    
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        
+        return Response({
+            'success': True,
+            'message': 'User registered successfully',
+            'data': UserSerializer(user).data
+        }, status=status.HTTP_201_CREATED)
+
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    """
+    Custom login endpoint that returns JWT tokens and user info.
+    """
+    serializer_class = CustomTokenObtainPairSerializer
+
+
+class UserProfileView(generics.RetrieveUpdateAPIView):
+    """
+    User profile endpoint.
+    Get or update the authenticated user's profile.
+    """
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_object(self):
+        return self.request.user
+
+
+class PasswordChangeView(APIView):
+    """
+    Password change endpoint.
+    Allows authenticated users to change their password.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        serializer = PasswordChangeSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+        
+        # Change password
+        user = request.user
+        user.set_password(serializer.validated_data['new_password'])
+        user.save()
+        
+        return Response({
+            'success': True,
+            'message': 'Password changed successfully'
+        }, status=status.HTTP_200_OK)
+```
+
+#### apps/authentication/urls.py
+```python
+"""
+Authentication URL configuration.
+"""
+from django.urls import path
+from rest_framework_simplejwt.views import TokenRefreshView
+from .views import (
+    UserRegistrationView,
+    CustomTokenObtainPairView,
+    UserProfileView,
+    PasswordChangeView
+)
+
+app_name = 'authentication'
+
+urlpatterns = [
+    # Registration
+    path('register/', UserRegistrationView.as_view(), name='register'),
+    
+    # Login/Token
+    path('login/', CustomTokenObtainPairView.as_view(), name='login'),
+    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    
+    # Profile
+    path('profile/', UserProfileView.as_view(), name='profile'),
+    path('password/change/', PasswordChangeView.as_view(), name='password_change'),
+]
+```
+
+#### apps/${input:app_name}/__init__.py
+```python
+"""
+${input:app_name} app - Main business logic for the application.
+This app contains the core functionality specific to this project.
+"""
+```
+
+#### apps/${input:app_name}/models.py
+```python
+"""
+Models for the ${input:app_name} app.
+Define your domain models here following Django best practices.
+"""
+from django.db import models
+from django.contrib.auth import get_user_model
+from apps.core.models import BaseModel, ActiveManager
+from apps.core.utils import generate_unique_slug
+
+User = get_user_model()
+
+
+class ExampleModel(BaseModel):
+    """
+    Example model showing common patterns.
+    Replace this with your actual domain models.
+    """
+    # Fields
+    name = models.CharField(max_length=255, help_text="Name of the item")
+    slug = models.SlugField(unique=True, blank=True, help_text="URL-friendly version of name")
+    description = models.TextField(blank=True, help_text="Detailed description")
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='${input:app_name}_items',
+        help_text="User who created this item"
+    )
+    
+    # Status choices
+    class StatusChoices(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        PUBLISHED = 'published', 'Published'
+        ARCHIVED = 'archived', 'Archived'
+    
+    status = models.CharField(
+        max_length=20,
+        choices=StatusChoices.choices,
+        default=StatusChoices.DRAFT,
+        help_text="Current status of the item"
+    )
+    
+    # Managers
+    objects = models.Manager()  # Default manager
+    active_objects = ActiveManager()  # Returns only active records
+    
+    class Meta:
+        db_table = '${input:app_name}_examples'
+        verbose_name = 'Example'
+        verbose_name_plural = 'Examples'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['slug']),
+            models.Index(fields=['user', 'status']),
+        ]
+    
+    def __str__(self):
+        return self.name
+    
+    def save(self, *args, **kwargs):
+        """Generate unique slug on save if not provided."""
+        if not self.slug:
+            self.slug = generate_unique_slug(self.name, ExampleModel)
+        super().save(*args, **kwargs)
+    
+    @property
+    def is_published(self):
+        """Check if the item is published."""
+        return self.status == self.StatusChoices.PUBLISHED
+```
+
+#### apps/${input:app_name}/serializers.py
+```python
+"""
+Serializers for the ${input:app_name} app.
+Define your API serializers here for data validation and transformation.
+"""
+from rest_framework import serializers
+from .models import ExampleModel
+
+
+class ExampleListSerializer(serializers.ModelSerializer):
+    """
+    Lightweight serializer for listing items.
+    Used in list views for better performance.
+    """
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    
+    class Meta:
+        model = ExampleModel
+        fields = ['id', 'name', 'slug', 'status', 'user_name', 'created_at']
+        read_only_fields = ['id', 'slug', 'created_at']
+
+
+class ExampleDetailSerializer(serializers.ModelSerializer):
+    """
+    Detailed serializer for single item views.
+    Includes all fields and related data.
+    """
+    user = serializers.SerializerMethodField()
+    is_published = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = ExampleModel
+        fields = [
+            'id', 'name', 'slug', 'description', 'status',
+            'user', 'is_published', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'slug', 'user', 'created_at', 'updated_at']
+    
+    def get_user(self, obj):
+        """Return user information."""
+        return {
+            'id': obj.user.id,
+            'username': obj.user.username,
+            'full_name': obj.user.get_full_name()
+        }
+
+
+class ExampleCreateUpdateSerializer(serializers.ModelSerializer):
+    """
+    Serializer for creating and updating items.
+    Handles validation and data transformation.
+    """
+    
+    class Meta:
+        model = ExampleModel
+        fields = ['name', 'description', 'status']
+    
+    def validate_name(self, value):
+        """Validate name field."""
+        if len(value) < 3:
+            raise serializers.ValidationError("Name must be at least 3 characters long.")
+        return value
+    
+    def create(self, validated_data):
+        """Create new item with current user."""
+        validated_data['user'] = self.context['request'].user
+        return super().create(validated_data)
+```
+
+#### apps/${input:app_name}/views.py
+```python
+"""
+Views for the ${input:app_name} app.
+Define your API views and viewsets here.
+"""
+from rest_framework import viewsets, status, filters
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django_filters.rest_framework import DjangoFilterBackend
+from apps.core.permissions import IsOwnerOrReadOnly
+from .models import ExampleModel
+from .serializers import (
+    ExampleListSerializer,
+    ExampleDetailSerializer,
+    ExampleCreateUpdateSerializer
+)
+
+
+class ExampleViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for ExampleModel with CRUD operations.
+    Includes filtering, searching, and custom actions.
+    """
+    permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['status', 'user']
+    search_fields = ['name', 'description']
+    ordering_fields = ['created_at', 'name']
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        """
+        Get queryset based on user permissions.
+        Non-staff users only see their own items.
+        """
+        queryset = ExampleModel.active_objects.select_related('user')
+        
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(user=self.request.user)
+        
+        return queryset
+    
+    def get_serializer_class(self):
+        """Return appropriate serializer based on action."""
+        if self.action == 'list':
+            return ExampleListSerializer
+        elif self.action in ['create', 'update', 'partial_update']:
+            return ExampleCreateUpdateSerializer
+        return ExampleDetailSerializer
+    
+    def perform_create(self, serializer):
+        """Set the user when creating new item."""
+        serializer.save(user=self.request.user)
+    
+    @action(detail=True, methods=['post'])
+    def publish(self, request, pk=None):
+        """
+        Custom action to publish an item.
+        Changes status to published.
+        """
+        item = self.get_object()
+        
+        if item.status == ExampleModel.StatusChoices.PUBLISHED:
+            return Response({
+                'success': False,
+                'error': {
+                    'code': 'already_published',
+                    'message': 'Item is already published'
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        item.status = ExampleModel.StatusChoices.PUBLISHED
+        item.save(update_fields=['status', 'updated_at'])
+        
+        return Response({
+            'success': True,
+            'message': 'Item published successfully',
+            'data': self.get_serializer(item).data
+        })
+    
+    @action(detail=False, methods=['get'])
+    def my_items(self, request):
+        """
+        Get items belonging to the current user.
+        """
+        queryset = self.get_queryset().filter(user=request.user)
+        serializer = self.get_serializer(queryset, many=True)
+        
+        return Response({
+            'success': True,
+            'data': serializer.data
+        })
+```
+
+#### apps/${input:app_name}/urls.py
+```python
+"""
+URL configuration for the ${input:app_name} app.
+"""
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import ExampleViewSet
+
+app_name = '${input:app_name}'
+
+router = DefaultRouter()
+router.register(r'examples', ExampleViewSet, basename='example')
+
+urlpatterns = [
+    path('', include(router.urls)),
+]
+```
+
+#### apps/${input:app_name}/admin.py
+```python
+"""
+Admin configuration for the ${input:app_name} app.
+Customize Django admin interface for your models.
+"""
+from django.contrib import admin
+from .models import ExampleModel
+
+
+@admin.register(ExampleModel)
+class ExampleModelAdmin(admin.ModelAdmin):
+    """Admin configuration for ExampleModel."""
+    list_display = ['name', 'user', 'status', 'created_at', 'is_active']
+    list_filter = ['status', 'is_active', 'created_at']
+    search_fields = ['name', 'description', 'user__username']
+    prepopulated_fields = {'slug': ('name',)}
+    date_hierarchy = 'created_at'
+    ordering = ['-created_at']
+    
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'slug', 'description', 'user')
+        }),
+        ('Status', {
+            'fields': ('status', 'is_active')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    readonly_fields = ['created_at', 'updated_at']
+    
+    def get_queryset(self, request):
+        """Optimize queryset with select_related."""
+        return super().get_queryset(request).select_related('user')
+```
 
 ### 6. Testing Setup
 
-Configure comprehensive testing following file:testing.instructions.md:
-
 #### tests/conftest.py
-- Global pytest fixtures
-- Database configuration
-- API client setup
-- Authentication fixtures
+```python
+"""
+Global pytest configuration and fixtures.
+Provides common test utilities and fixtures for all tests.
+"""
+import pytest
+from rest_framework.test import APIClient
+from django.contrib.auth import get_user_model
 
-#### tests/factories/
-- Factory Boy factories for test data
-- User factory
-- Model factories for ${input:app_name}
+User = get_user_model()
 
-#### tests/unit/
-- Model tests
-- Serializer tests
-- View tests
-- Utility tests
 
-#### tests/integration/
-- API integration tests
-- Database integration tests
-- Workflow tests
+@pytest.fixture
+def api_client():
+    """Provide an API client for tests."""
+    return APIClient()
+
+
+@pytest.fixture
+def user(db):
+    """Create a test user."""
+    return User.objects.create_user(
+        username='testuser',
+        email='test@example.com',
+        password='testpass123',
+        first_name='Test',
+        last_name='User'
+    )
+
+
+@pytest.fixture
+def authenticated_client(api_client, user):
+    """Provide an authenticated API client."""
+    api_client.force_authenticate(user=user)
+    return api_client
+
+
+@pytest.fixture
+def admin_user(db):
+    """Create an admin user."""
+    return User.objects.create_superuser(
+        username='admin',
+        email='admin@example.com',
+        password='adminpass123'
+    )
+
+
+@pytest.fixture
+def admin_client(api_client, admin_user):
+    """Provide an authenticated admin API client."""
+    api_client.force_authenticate(user=admin_user)
+    return api_client
+```
+
+#### tests/factories/__init__.py
+```python
+"""
+Factory Boy factories for generating test data.
+Provides realistic test data for models.
+"""
+import factory
+from django.contrib.auth import get_user_model
+from apps.${input:app_name}.models import ExampleModel
+
+User = get_user_model()
+
+
+class UserFactory(factory.django.DjangoModelFactory):
+    """Factory for creating test users."""
+    
+    class Meta:
+        model = User
+    
+    username = factory.Sequence(lambda n: f'user{n}')
+    email = factory.LazyAttribute(lambda obj: f'{obj.username}@example.com')
+    first_name = factory.Faker('first_name')
+    last_name = factory.Faker('last_name')
+    
+    @factory.post_generation
+    def password(obj, create, extracted, **kwargs):
+        if not create:
+            return
+        
+        password = extracted or 'defaultpass123'
+        obj.set_password(password)
+        obj.save()
+
+
+class ExampleModelFactory(factory.django.DjangoModelFactory):
+    """Factory for creating test ExampleModel instances."""
+    
+    class Meta:
+        model = ExampleModel
+    
+    name = factory.Faker('sentence', nb_words=3)
+    description = factory.Faker('text')
+    user = factory.SubFactory(UserFactory)
+    status = ExampleModel.StatusChoices.DRAFT
+```
 
 ### 7. Docker Configuration (if ${input:use_docker} is true)
-
-Create Docker configuration:
 
 #### Dockerfile
 ```dockerfile
 FROM python:3.11-slim
 
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Set work directory
 WORKDIR /app
 
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
 COPY requirements/ requirements/
+RUN pip install --upgrade pip
 RUN pip install -r requirements/production.txt
 
+# Copy project
 COPY . .
 
-EXPOSE 8000
+# Collect static files
+RUN python manage.py collectstatic --noinput
 
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
+# Run gunicorn
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "config.wsgi:application"]
 ```
 
 #### docker-compose.yml
-Include services for:
-- Django application
-- Database (${input:database_type})
-- Redis (if ${input:include_celery} is true)
-- Celery worker (if ${input:include_celery} is true)
+```yaml
+version: '3.8'
 
-### 8. GitHub Integration
+services:
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
 
-#### .github/workflows/ci.yml
-Create CI pipeline with:
-- Python version matrix testing
-- Code quality checks (black, isort, flake8, mypy)
-- Test execution with coverage
-- Security scanning
+  db:
+    image: postgres:14
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    ports:
+      - "5432:5432"
 
-#### .github/workflows/deploy.yml
-Create deployment pipeline for:
-- Docker image building
-- Production deployment
-- Database migrations
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
 
-### 9. Documentation
+  celery:
+    build: .
+    command: celery -A config worker -l info
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+
+  celery-beat:
+    build: .
+    command: celery -A config beat -l info
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  postgres_data:
+```
+
+### 8. Documentation
 
 #### README.md
-Create comprehensive documentation including:
-- Project overview
-- Setup instructions
-- Environment variables
-- API documentation links
-- Development workflow
-- Deployment instructions
+```markdown
+# ${input:project_name}
+
+A production-ready Django REST Framework project with modern Python practices.
+
+## Features
+
+- Django 4.2+ with Django REST Framework
+- JWT Authentication
+- API Documentation with Swagger/ReDoc
+- Comprehensive testing with pytest
+- Docker support
+- Celery integration (optional)
+- Health check endpoint
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.11+
+- PostgreSQL/MySQL (or SQLite for development)
+- Redis (for caching and Celery)
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd ${input:project_name}
+```
+
+2. Create virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements/development.txt
+```
+
+4. Set up environment variables:
+```bash
+cp .env.example .env
+# Edit .env with your configuration
+```
+
+5. Run migrations:
+```bash
+python manage.py migrate
+```
+
+6. Create superuser:
+```bash
+python manage.py createsuperuser
+```
+
+7. Run development server:
+```bash
+python manage.py runserver
+```
+
+## API Documentation
+
+API documentation is available at:
+- Swagger UI: http://localhost:8000/api/v1/swagger/
+- ReDoc: http://localhost:8000/api/v1/redoc/
+
+## Health Check
+
+Health check endpoint: http://localhost:8000/api/v1/health/
+
+## Testing
+
+Run tests with pytest:
+```bash
+pytest
+```
+
+Run with coverage:
+```bash
+pytest --cov=apps --cov-report=html
+```
+
+## Docker
+
+Build and run with Docker Compose:
+```bash
+docker-compose up --build
+```
+
+## Project Structure
+
+```
+${input:project_name}/
+├── apps/                   # Django applications
+│   ├── core/              # Base models, utilities, middleware
+│   ├── authentication/    # User authentication
+│   ├── api/              # API routing and documentation
+│   └── ${input:app_name}/         # Main business logic
+├── config/                # Django configuration
+├── tests/                 # Test files
+├── requirements/          # Dependencies
+└── docs/                  # Documentation
+```
+
+## Environment Variables
+
+See `.env.example` for required environment variables.
+
+## Contributing
+
+1. Create a feature branch
+2. Make your changes
+3. Run tests and linting
+4. Submit a pull request
+
+## License
+
+[Your License]
+```
 
 #### .env.example
-Template for environment variables:
 ```
+# Django settings
 DEBUG=True
 SECRET_KEY=your-secret-key-here
-DATABASE_URL=${input:database_type}://user:pass@localhost/dbname
+ALLOWED_HOSTS=localhost,127.0.0.1
+
+# Database
+DB_NAME=${input:project_name}_db
+DB_USER=${input:project_name}_user
+DB_PASSWORD=your-db-password
+DB_HOST=localhost
+DB_PORT=5432
+
+# Redis
 REDIS_URL=redis://localhost:6379/0
-JWT_SECRET_KEY=your-jwt-secret-here
+
+# JWT
+JWT_SECRET_KEY=your-jwt-secret-key
+
+# CORS
+CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
+CORS_ALLOW_ALL_ORIGINS=False
+
+# Celery (if enabled)
+CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_RESULT_BACKEND=redis://localhost:6379/0
+
+# Logging
+LOG_LEVEL=INFO
+DJANGO_LOG_LEVEL=INFO
 ```
 
-### 10. Code Quality Setup
+### 9. Code Quality Setup
 
 #### .editorconfig
 ```ini
@@ -299,12 +1937,56 @@ max_line_length = 88
 [*.{yml,yaml,json}]
 indent_style = space
 indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
 ```
 
 #### .gitignore
-Include Python, Django, and IDE-specific ignores
+```
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
 
-### 11. Final Setup Commands
+# Django
+*.log
+*.pot
+*.pyc
+db.sqlite3
+media/
+staticfiles/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+```
+
+### 10. Final Setup Commands
 
 Execute final setup:
 
@@ -316,7 +1998,7 @@ python manage.py migrate
 # Create superuser
 python manage.py createsuperuser
 
-# Collect static files (production)
+# Collect static files (for production)
 python manage.py collectstatic --noinput
 
 # Run tests
@@ -333,32 +2015,25 @@ mypy .
 
 A fully configured Django REST Framework project with:
 
-✅ Modern Python project structure
+✅ Modern Python project structure with meaningful code examples
 ✅ Production-ready Django configuration  
 ✅ JWT authentication setup
+✅ Health check endpoint at /api/v1/health
 ✅ API documentation with drf-yasg
+✅ Base models, middleware, exceptions, and utilities
 ✅ Comprehensive testing suite
 ✅ Code quality tools configured
 ✅ Docker support (if requested)
 ✅ Celery integration (if requested)
-✅ CI/CD pipelines
 ✅ Proper documentation
-
-## Instructions Reference
-
-This initialization follows the patterns and best practices defined in:
-- file:.github/instructions/copilot.instructions.md
-- file:.github/instructions/django.instructions.md  
-- file:.github/instructions/python.instructions.md
-- file:.github/instructions/testing.instructions.md
 
 ## Next Steps
 
 1. Customize the `${input:app_name}` models for your specific business logic
-2. Implement API endpoints following the established patterns
+2. Implement additional API endpoints following the established patterns
 3. Add comprehensive tests for your business logic
 4. Configure production deployment
 5. Set up monitoring and logging
 6. Implement additional security measures as needed
 
-**Note**: Ensure all environment variables are properly configured before running the application. Review the .env.example file and create your local .env file with appropriate values for `${input:database_type}` and other services.
+**Note**: All app folders now contain meaningful Python files with example code and comprehensive documentation. The project is ready for immediate development with a working health check endpoint at `/api/v1/health/`.
