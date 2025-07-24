@@ -10,7 +10,180 @@ This prompt helps you verify if an existing Django REST Framework project can ru
 
 Welcome! This tool will help you check and fix an existing Django project to ensure it runs successfully.
 
-### Step 1: Initial Project Assessment
+## Step 1: System Environment Analysis
+
+**Let's first analyze your system environment before proceeding with the Django project check.**
+
+### 1.1 Current Directory and Operating System Check
+
+**Check current working directory:**
+```bash
+# Show current directory
+pwd
+
+# List contents of current directory
+ls -la  # Linux/macOS
+dir     # Windows
+```
+
+**Detect operating system:**
+```bash
+# Linux/macOS
+uname -s
+
+# Windows (PowerShell)
+$PSVersionTable.OS
+
+# Windows (Command Prompt)
+echo %OS%
+```
+
+**Expected Results:**
+- **Linux**: `Linux`
+- **macOS**: `Darwin` 
+- **Windows**: `Windows_NT` or Windows version info
+
+### 1.2 Python Installation Check
+
+**Check if Python is installed:**
+
+```bash
+# Method 1: Check Python 3
+python3 --version
+python --version
+
+# Method 2: Check Python installation path
+which python3    # Linux/macOS
+which python     # Linux/macOS
+where python     # Windows
+```
+
+**Expected Results:**
+- ✅ **Python Found**: Shows version (e.g., `Python 3.9.7`)
+- ❌ **Python Not Found**: Command not found error
+
+### 1.3 Conda Environment Check
+
+**If Python is not found, check for Conda:**
+
+```bash
+# Check if conda is installed
+conda --version
+conda info
+
+# Check current conda environment
+conda info --envs
+conda env list
+```
+
+**Conda Environment Analysis:**
+
+**If Conda is available:**
+```bash
+# List all conda environments
+conda env list
+
+# Check if project-specific environment exists
+# Look for environment named: ${input:project_name} or similar
+```
+
+**Expected Conda Results:**
+- ✅ **Conda Available**: Shows conda version and environment list
+- ❌ **Conda Not Available**: Command not found
+
+### 1.4 System Requirements Resolution
+
+**Based on the checks above, follow the appropriate path:**
+
+#### Path A: Python Found ✅
+```bash
+echo "✅ Python is available"
+python --version
+# Proceed to Step 2
+```
+
+#### Path B: Conda Available, No Python ⚠️
+```bash
+echo "⚠️ Conda found, checking for project environment..."
+
+# Check if project environment exists
+conda env list | grep ${input:project_name}
+
+# If project environment exists:
+echo "✅ Found existing conda environment: ${input:project_name}"
+conda activate ${input:project_name}
+
+# If no project environment exists:
+echo "Creating new conda environment for ${input:project_name}"
+conda create -n ${input:project_name} python=3.9 -y
+conda activate ${input:project_name}
+```
+
+#### Path C: Neither Python nor Conda Available ❌
+
+**STOP - Installation Required**
+
+```bash
+echo "❌ Neither Python nor Conda is installed on this system"
+echo "Please install one of the following before proceeding:"
+```
+
+**Installation Instructions:**
+
+**For Linux (Ubuntu/Debian):**
+```bash
+# Install Python
+sudo apt update
+sudo apt install python3 python3-pip python3-venv
+
+# Or install Miniconda
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+bash Miniconda3-latest-Linux-x86_64.sh
+```
+
+**For macOS:**
+```bash
+# Install Python via Homebrew
+brew install python3
+
+# Or install Miniconda
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh
+bash Miniconda3-latest-MacOSX-x86_64.sh
+```
+
+**For Windows:**
+```powershell
+# Install Python from python.org
+# Download from: https://www.python.org/downloads/windows/
+
+# Or install Miniconda
+# Download from: https://docs.conda.io/en/latest/miniconda.html
+```
+
+**⚠️ IMPORTANT: After installing Python or Conda, restart your terminal and run this check again.**
+
+### 1.5 Environment Verification Summary
+
+**System Check Results:**
+
+| Component | Status | Action Required |
+|-----------|--------|----------------|
+| **Operating System** | `[Detected OS]` | None |
+| **Current Directory** | `[Current Path]` | Navigate if needed |
+| **Python Installation** | ✅/❌ | Install if missing |
+| **Conda Installation** | ✅/❌ | Alternative to Python |
+| **Project Environment** | ✅/❌ | Create/Activate |
+
+**Proceed only when:**
+- ✅ Python OR Conda is available
+- ✅ Project environment is active (if using Conda)
+- ✅ Current directory is confirmed
+
+---
+
+## Step 2: Project Location and Structure Assessment
+
+**Now that the system environment is verified, let's locate and check your Django project.**
 
 **First, let me ask: Do you need to check if your Django project folder exists and is properly structured?**
 
@@ -22,7 +195,7 @@ Welcome! This tool will help you check and fix an existing Django project to ens
 
 ## Option A: If User Chooses "YES" - Full Project Structure Check
 
-### 1.1 Verify Project Directory Structure
+### 2.1 Verify Project Directory Structure
 
 **Please provide your project name:**
 - Project Name: `${input:project_name}`
@@ -61,7 +234,7 @@ ${input:project_name}/
 - ⚠️ **Incomplete**: Missing directories → Follow repair instructions below
 - ❌ **Not Found**: Project directory doesn't exist → Use Project Init prompt first
 
-### 1.2 Fix Missing Structure (if needed)
+### 2.2 Fix Missing Structure (if needed)
 
 **If structure is incomplete, create missing directories:**
 
@@ -78,9 +251,9 @@ touch apps/api/__init__.py apps/authentication/__init__.py apps/core/__init__.py
 
 ---
 
-## Step 2: Environment Setup and Dependency Check
+## Step 3: Environment Setup and Dependency Check
 
-### 2.1 Navigate to Project Directory
+### 3.1 Navigate to Project Directory
 
 ```bash
 # Change to project directory
@@ -91,7 +264,9 @@ pwd
 ls -la
 ```
 
-### 2.2 Virtual Environment Setup (OS-Specific)
+### 3.2 Virtual Environment Setup (OS-Specific)
+
+**Note: Skip this section if using Conda (environment already activated in Step 1)**
 
 **For Linux/macOS:**
 ```bash
@@ -132,7 +307,7 @@ venv\Scripts\Activate.ps1
 
 **Expected Result:** Virtual environment should be active (prompt shows `(venv)`)
 
-### 2.3 Install Dependencies
+### 3.3 Install Dependencies
 
 ```bash
 # Upgrade pip first
@@ -158,9 +333,9 @@ python -c "import django; print(f'Django version: {django.get_version()}')"
 python -c "import rest_framework; print('DRF installed successfully')"
 ```
 
-## Step 3: Django Project Health Verification
+## Step 4: Django Project Health Verification
 
-### 3.1 Initial Django System Check
+### 4.1 Initial Django System Check
 
 ```bash
 # Run Django system checks
@@ -171,7 +346,7 @@ python manage.py check
 
 **If errors occur, proceed to Error Fixing section below.**
 
-### 3.2 Database Migration Check
+### 4.2 Database Migration Check
 
 ```bash
 # Check migration status
@@ -184,7 +359,7 @@ python manage.py makemigrations
 python manage.py migrate
 ```
 
-### 3.3 Development Server Launch Test
+### 4.3 Development Server Launch Test
 
 ```bash
 # Start development server
@@ -196,7 +371,7 @@ python manage.py runserver
 
 **Keep server running and test in new terminal/browser:**
 
-### 3.4 Health API Endpoint Verification
+### 4.4 Health API Endpoint Verification
 
 **Test the following URLs:**
 
@@ -213,7 +388,7 @@ python manage.py runserver
 
 ---
 
-## Step 4: Common Error Fixing Workflow
+## Step 5: Common Error Fixing Workflow
 
 **If any step fails, follow this systematic error fixing approach:**
 
@@ -319,7 +494,7 @@ python manage.py migrate
 # Check database connection settings in config/settings/base.py
 ```
 
-## Step 5: Final Verification Loop
+## Step 6: Final Verification Loop
 
 **Repeat until successful:**
 
@@ -343,7 +518,7 @@ curl http://127.0.0.1:8000/api/v1/health/
 - ✅ Admin panel is accessible
 - ✅ No error messages in terminal
 
-## Step 6: Project Status Report
+## Step 7: Project Status Report
 
 **Once health API is working, provide status report:**
 
@@ -402,12 +577,14 @@ Quit the server with CONTROL-C.
 
 **Skip structure verification and go directly to environment setup:**
 
+**Prerequisites:** System environment analysis from Step 1 must be completed first.
+
 1. Navigate to project: `cd ${input:project_name}`
-2. Set up virtual environment (OS-specific commands above)
+2. Set up virtual environment (OS-specific commands from Step 3.2) or use activated Conda environment
 3. Install packages: `pip install -r requirements/development.txt`
 4. Run migrations: `python manage.py migrate`
 5. Check health API: `python manage.py runserver` → Test http://127.0.0.1:8000/api/v1/health/
-6. Fix errors using the error fixing workflow above
+6. Fix errors using the error fixing workflow from Step 5
 7. Stop when health API works successfully
 
 ---
