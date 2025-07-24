@@ -49,6 +49,7 @@ ${input:project_name}/
 Django>=4.2,<5.0
 djangorestframework>=3.14.0
 python-decouple>=3.8
+drf-yasg>=1.21.0
 ```
 
 #### .gitignore
@@ -137,6 +138,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # Third party apps
     'rest_framework',
+    'drf_yasg',
     # Local apps
     'apps.api',
 ]
@@ -221,15 +223,18 @@ REST_FRAMEWORK = {
 #### apps/api/views.py
 ```python
 """
-Simple API views with health check endpoint.
+Simple API views with health check endpoint and Swagger documentation.
 """
 from django.http import JsonResponse
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 def health_check(request):
     """
     Health check endpoint to verify the API is running.
+    Returns the current status of the API service.
     """
     return JsonResponse({
         'status': 'healthy',
@@ -237,15 +242,36 @@ def health_check(request):
         'message': 'API is running successfully!'
     })
 
+@swagger_auto_schema(
+    method='get',
+    operation_description="Get API information and available endpoints",
+    responses={
+        200: openapi.Response(
+            description="API information",
+            examples={
+                "application/json": {
+                    "message": "Welcome to ${input:project_name} API",
+                    "endpoints": {
+                        "health": "/api/health/",
+                        "swagger": "/api/swagger/",
+                        "admin": "/admin/"
+                    }
+                }
+            }
+        )
+    }
+)
 @api_view(['GET'])
 def api_root(request):
     """
-    API root endpoint showing available endpoints.
+    API root endpoint showing available endpoints and documentation.
     """
     return Response({
         'message': 'Welcome to ${input:project_name} API',
         'endpoints': {
             'health': '/api/health/',
+            'swagger': '/api/swagger/',
+            'redoc': '/api/redoc/',
             'admin': '/admin/'
         }
     })
@@ -254,14 +280,36 @@ def api_root(request):
 #### apps/api/urls.py
 ```python
 """
-API URL configuration.
+API URL configuration with Swagger documentation.
 """
 from django.urls import path
+from rest_framework import permissions
+from drf_yasg.views import get_schema_view
+from drf_yasg import openapi
 from . import views
 
+# Swagger/OpenAPI schema configuration
+schema_view = get_schema_view(
+    openapi.Info(
+        title="${input:project_name} API",
+        default_version='v1',
+        description="Simple API for ${input:project_name} project",
+        contact=openapi.Contact(email="contact@example.com"),
+        license=openapi.License(name="MIT License"),
+    ),
+    public=True,
+    permission_classes=[permissions.AllowAny],
+)
+
 urlpatterns = [
+    # API endpoints
     path('', views.api_root, name='api_root'),
     path('health/', views.health_check, name='health_check'),
+    
+    # Swagger documentation
+    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+    path('swagger.json', schema_view.without_ui(cache_timeout=0), name='schema-json'),
 ]
 ```
 
@@ -298,6 +346,8 @@ python manage.py runserver
 
 - ✅ **API Root**: http://127.0.0.1:8000/api/
 - ✅ **Health Check**: http://127.0.0.1:8000/api/health/
+- ✅ **Swagger UI**: http://127.0.0.1:8000/api/swagger/
+- ✅ **ReDoc**: http://127.0.0.1:8000/api/redoc/
 - ✅ **Admin Panel**: http://127.0.0.1:8000/admin/
 
 **Expected Health Check Response:**
@@ -309,11 +359,29 @@ python manage.py runserver
 }
 ```
 
+**Expected API Root Response:**
+```json
+{
+    "message": "Welcome to ${input:project_name} API",
+    "endpoints": {
+        "health": "/api/health/",
+        "swagger": "/api/swagger/",
+        "redoc": "/api/redoc/",
+        "admin": "/admin/"
+    }
+}
+```
+
 ## Common Issues and Quick Fixes
 
 ### Issue: "No module named 'decouple'"
 ```bash
 pip install python-decouple
+```
+
+### Issue: "No module named 'drf_yasg'" 
+```bash
+pip install drf-yasg
 ```
 
 ### Issue: "Secret key error"
@@ -335,6 +403,8 @@ python manage.py runserver 8001
 Your simple Django project is now running with:
 - ✅ Minimal structure (only essential files)
 - ✅ Working health check endpoint
+- ✅ Swagger UI documentation at `/api/swagger/`
+- ✅ ReDoc documentation at `/api/redoc/`
 - ✅ Admin panel ready
 - ✅ SQLite database (no external DB needed)
 - ✅ Environment variables support
