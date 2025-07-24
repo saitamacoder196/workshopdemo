@@ -441,6 +441,88 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 ```
 
+#### config/urls.py
+```python
+"""
+Main URL configuration for ${input:project_name} project.
+"""
+from django.contrib import admin
+from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
+
+urlpatterns = [
+    # Admin interface
+    path('admin/', admin.site.urls),
+    
+    # API endpoints
+    path('api/v1/', include('apps.api.urls')),
+]
+
+# Serve media files in development
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    
+    # Add Django Debug Toolbar URLs
+    if 'debug_toolbar' in settings.INSTALLED_APPS:
+        import debug_toolbar
+        urlpatterns = [
+            path('__debug__/', include(debug_toolbar.urls)),
+        ] + urlpatterns
+
+# Customize admin site headers
+admin.site.site_header = '${input:project_name} Administration'
+admin.site.site_title = '${input:project_name} Admin Portal'
+admin.site.index_title = 'Welcome to ${input:project_name} Administration'
+```
+
+#### config/settings/testing.py
+```python
+"""Testing settings for ${input:project_name} project."""
+from .base import *
+
+# Test database
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': ':memory:',
+    }
+}
+
+# Disable migrations for faster tests
+class DisableMigrations:
+    def __contains__(self, item):
+        return True
+    
+    def __getitem__(self, item):
+        return None
+
+MIGRATION_MODULES = DisableMigrations()
+
+# Faster password hashing for tests
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.MD5PasswordHasher',
+]
+
+# Disable cache for tests
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+    }
+}
+
+# Disable logging during tests
+LOGGING_CONFIG = None
+
+# Celery settings for testing
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True
+
+# Email backend for tests
+EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
+```
+
 ### 5. Core Django Apps Setup
 
 #### apps/core/__init__.py
@@ -449,6 +531,28 @@ SECURE_HSTS_PRELOAD = True
 Core app containing base models, utilities, exceptions, and middlewares.
 This app provides common functionality used across the entire project.
 """
+```
+
+#### apps/core/apps.py
+```python
+"""
+App configuration for the core app.
+"""
+from django.apps import AppConfig
+
+
+class CoreConfig(AppConfig):
+    """Configuration for the core app."""
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.core'
+    verbose_name = 'Core'
+    
+    def ready(self):
+        """Import signals when the app is ready."""
+        try:
+            import apps.core.signals  # noqa F401
+        except ImportError:
+            pass
 ```
 
 #### apps/core/models.py
@@ -887,6 +991,21 @@ This app serves as the main entry point for all API endpoints.
 """
 ```
 
+#### apps/api/apps.py
+```python
+"""
+App configuration for the API app.
+"""
+from django.apps import AppConfig
+
+
+class ApiConfig(AppConfig):
+    """Configuration for the API app."""
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.api'
+    verbose_name = 'API'
+```
+
 #### apps/api/urls.py
 ```python
 """
@@ -1007,6 +1126,28 @@ class HealthCheckView(APIView):
 Authentication app for handling user authentication and authorization.
 Provides JWT authentication, user management, and permission handling.
 """
+```
+
+#### apps/authentication/apps.py
+```python
+"""
+App configuration for the authentication app.
+"""
+from django.apps import AppConfig
+
+
+class AuthenticationConfig(AppConfig):
+    """Configuration for the authentication app."""
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.authentication'
+    verbose_name = 'Authentication'
+    
+    def ready(self):
+        """Import signals when the app is ready."""
+        try:
+            import apps.authentication.signals  # noqa F401
+        except ImportError:
+            pass
 ```
 
 #### apps/authentication/models.py
@@ -1262,6 +1403,28 @@ urlpatterns = [
 ${input:app_name} app - Main business logic for the application.
 This app contains the core functionality specific to this project.
 """
+```
+
+#### apps/${input:app_name}/apps.py
+```python
+"""
+App configuration for the ${input:app_name} app.
+"""
+from django.apps import AppConfig
+
+
+class ${input:app_name|title}Config(AppConfig):
+    """Configuration for the ${input:app_name} app."""
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.${input:app_name}'
+    verbose_name = '${input:app_name|title}'
+    
+    def ready(self):
+        """Import signals when the app is ready."""
+        try:
+            import apps.${input:app_name}.signals  # noqa F401
+        except ImportError:
+            pass
 ```
 
 #### apps/${input:app_name}/models.py
@@ -1559,6 +1722,356 @@ class ExampleModelAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         """Optimize queryset with select_related."""
         return super().get_queryset(request).select_related('user')
+```
+
+#### utils/__init__.py
+```python
+"""
+Utility modules for the project.
+This package contains reusable utilities, validators, decorators, and mixins.
+"""
+```
+
+#### utils/validators.py
+```python
+"""
+Custom validators for form fields and model fields.
+"""
+import re
+from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
+
+
+def validate_phone_number(value):
+    """
+    Validate phone number format.
+    Accepts formats like: +1234567890, (123) 456-7890, 123-456-7890
+    """
+    phone_regex = re.compile(r'^\+?1?\d{9,15}$')
+    if not phone_regex.match(value.replace('(', '').replace(')', '').replace('-', '').replace(' ', '')):
+        raise ValidationError(
+            _('Enter a valid phone number.'),
+            code='invalid_phone'
+        )
+
+
+def validate_alphanumeric_with_spaces(value):
+    """Validate that the value contains only alphanumeric characters and spaces."""
+    if not re.match(r'^[a-zA-Z0-9\s]+$', value):
+        raise ValidationError(
+            _('This field can only contain letters, numbers, and spaces.'),
+            code='invalid_alphanumeric'
+        )
+
+
+def validate_no_special_characters(value):
+    """Validate that the value contains no special characters."""
+    if re.search(r'[!@#$%^&*(),.?":{}|<>]', value):
+        raise ValidationError(
+            _('This field cannot contain special characters.'),
+            code='no_special_chars'
+        )
+
+
+def validate_file_size(value):
+    """Validate file size (max 5MB)."""
+    filesize = value.size
+    if filesize > 5 * 1024 * 1024:  # 5MB
+        raise ValidationError(
+            _('File size cannot exceed 5MB.'),
+            code='file_too_large'
+        )
+
+
+def validate_image_extension(value):
+    """Validate image file extension."""
+    valid_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+    if not any(value.name.lower().endswith(ext) for ext in valid_extensions):
+        raise ValidationError(
+            _('File must be a valid image format (JPG, PNG, GIF, WebP).'),
+            code='invalid_image_extension'
+        )
+```
+
+#### utils/decorators.py
+```python
+"""
+Custom decorators for views and functions.
+"""
+import functools
+import time
+from django.core.cache import cache
+from django.http import JsonResponse
+from django.views.decorators.cache import cache_page
+from django.utils.decorators import method_decorator
+
+
+def rate_limit(requests_per_minute=60):
+    """
+    Rate limiting decorator.
+    Limits the number of requests per minute from the same IP.
+    """
+    def decorator(view_func):
+        @functools.wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            # Get client IP
+            ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0] or \
+                 request.META.get('REMOTE_ADDR', '')
+            
+            # Create cache key
+            cache_key = f'rate_limit_{ip}_{view_func.__name__}'
+            
+            # Get current request count
+            current_requests = cache.get(cache_key, 0)
+            
+            if current_requests >= requests_per_minute:
+                return JsonResponse({
+                    'success': False,
+                    'error': {
+                        'code': 'rate_limit_exceeded',
+                        'message': 'Too many requests. Please try again later.'
+                    }
+                }, status=429)
+            
+            # Increment counter
+            cache.set(cache_key, current_requests + 1, 60)  # 60 seconds
+            
+            return view_func(request, *args, **kwargs)
+        return wrapper
+    return decorator
+
+
+def log_execution_time(func):
+    """
+    Decorator to log function execution time.
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        
+        print(f"{func.__name__} executed in {end_time - start_time:.4f} seconds")
+        return result
+    return wrapper
+
+
+def require_ajax(view_func):
+    """
+    Decorator that ensures the request is made via AJAX.
+    """
+    @functools.wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': False,
+                'error': {
+                    'code': 'ajax_required',
+                    'message': 'This endpoint requires an AJAX request.'
+                }
+            }, status=400)
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+def cache_view(timeout=300):
+    """
+    Class decorator for caching class-based views.
+    """
+    def decorator(cls):
+        cls.dispatch = method_decorator(cache_page(timeout))(cls.dispatch)
+        return cls
+    return decorator
+```
+
+#### utils/pagination.py
+```python
+"""
+Custom pagination classes for API responses.
+"""
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.response import Response
+from collections import OrderedDict
+
+
+class CustomPageNumberPagination(PageNumberPagination):
+    """
+    Custom pagination class with enhanced response format.
+    """
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+    
+    def get_paginated_response(self, data):
+        """
+        Return a paginated style Response object with additional metadata.
+        """
+        return Response(OrderedDict([
+            ('success', True),
+            ('count', self.page.paginator.count),
+            ('total_pages', self.page.paginator.num_pages),
+            ('current_page', self.page.number),
+            ('page_size', self.page_size),
+            ('next', self.get_next_link()),
+            ('previous', self.get_previous_link()),
+            ('results', data)
+        ]))
+
+
+class LargeResultsSetPagination(PageNumberPagination):
+    """
+    Pagination class for large datasets.
+    """
+    page_size = 50
+    page_size_query_param = 'page_size'
+    max_page_size = 200
+
+
+class SmallResultsSetPagination(PageNumberPagination):
+    """
+    Pagination class for small datasets.
+    """
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 50
+```
+
+#### utils/mixins.py
+```python
+"""
+Custom mixins for views and models.
+"""
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import PermissionDenied
+from django.http import JsonResponse
+from rest_framework import status
+from rest_framework.response import Response
+
+
+class AjaxRequiredMixin:
+    """
+    Mixin that requires AJAX requests.
+    """
+    def dispatch(self, request, *args, **kwargs):
+        if not request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': False,
+                'error': {
+                    'code': 'ajax_required',
+                    'message': 'This endpoint requires an AJAX request.'
+                }
+            }, status=400)
+        return super().dispatch(request, *args, **kwargs)
+
+
+class StaffRequiredMixin(LoginRequiredMixin):
+    """
+    Mixin that requires staff privileges.
+    """
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_staff:
+            raise PermissionDenied("Staff privileges required.")
+        return super().dispatch(request, *args, **kwargs)
+
+
+class SuperUserRequiredMixin(LoginRequiredMixin):
+    """
+    Mixin that requires superuser privileges.
+    """
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_superuser:
+            raise PermissionDenied("Superuser privileges required.")
+        return super().dispatch(request, *args, **kwargs)
+
+
+class JSONResponseMixin:
+    """
+    Mixin for consistent JSON responses.
+    """
+    def json_response(self, data=None, success=True, message=None, status_code=200):
+        """
+        Return a JSON response with consistent format.
+        """
+        response_data = {
+            'success': success,
+        }
+        
+        if message:
+            response_data['message'] = message
+        
+        if data is not None:
+            response_data['data'] = data
+        
+        return JsonResponse(response_data, status=status_code)
+    
+    def json_error_response(self, message, code=None, status_code=400):
+        """
+        Return a JSON error response.
+        """
+        error_data = {'message': message}
+        if code:
+            error_data['code'] = code
+        
+        return JsonResponse({
+            'success': False,
+            'error': error_data
+        }, status=status_code)
+
+
+class CacheControlMixin:
+    """
+    Mixin for adding cache control headers.
+    """
+    cache_timeout = 300  # 5 minutes
+    
+    def dispatch(self, request, *args, **kwargs):
+        response = super().dispatch(request, *args, **kwargs)
+        response['Cache-Control'] = f'max-age={self.cache_timeout}'
+        return response
+
+
+class TimestampMixin:
+    """
+    Mixin for models that need created_at and updated_at fields.
+    This is now replaced by BaseModel, but kept for backward compatibility.
+    """
+    pass
+
+
+class SoftDeleteMixin:
+    """
+    Mixin for implementing soft delete functionality.
+    This is now replaced by BaseModel, but kept for backward compatibility.
+    """
+    pass
+
+
+class APIResponseMixin:
+    """
+    Mixin for DRF views to provide consistent API responses.
+    """
+    def success_response(self, data=None, message=None, status_code=status.HTTP_200_OK):
+        """Return a success response."""
+        response_data = {'success': True}
+        
+        if message:
+            response_data['message'] = message
+        
+        if data is not None:
+            response_data['data'] = data
+        
+        return Response(response_data, status=status_code)
+    
+    def error_response(self, message, code=None, status_code=status.HTTP_400_BAD_REQUEST):
+        """Return an error response."""
+        error_data = {'message': message}
+        if code:
+            error_data['code'] = code
+        
+        return Response({
+            'success': False,
+            'error': error_data
+        }, status=status_code)
 ```
 
 ### 6. Testing Setup
@@ -1986,7 +2499,138 @@ Thumbs.db
 docker-compose.override.yml
 ```
 
-### 10. Final Setup Commands
+### 10. Verify and Complete Folder Structure
+
+Before proceeding with setup commands, verify that all required directories exist to avoid errors:
+
+```bash
+# Create any missing directories in the structure
+mkdir -p apps/core/migrations
+mkdir -p apps/core/management/commands
+mkdir -p apps/core/templatetags
+mkdir -p apps/authentication/migrations
+mkdir -p apps/authentication/management/commands
+mkdir -p apps/api/migrations
+mkdir -p apps/${input:app_name}/migrations
+mkdir -p apps/${input:app_name}/management/commands
+mkdir -p apps/${input:app_name}/templates/${input:app_name}
+mkdir -p apps/${input:app_name}/static/${input:app_name}
+mkdir -p config/settings
+mkdir -p tests/unit/core
+mkdir -p tests/unit/authentication
+mkdir -p tests/unit/api
+mkdir -p tests/unit/${input:app_name}
+mkdir -p tests/integration/core
+mkdir -p tests/integration/authentication
+mkdir -p tests/integration/api
+mkdir -p tests/integration/${input:app_name}
+mkdir -p tests/fixtures
+mkdir -p tests/mocks
+mkdir -p utils
+mkdir -p scripts
+mkdir -p docs/api
+mkdir -p docs/deployment
+mkdir -p static/css
+mkdir -p static/js
+mkdir -p static/img
+mkdir -p media/uploads
+mkdir -p logs
+mkdir -p locale
+
+# Create __init__.py files for Python packages
+touch apps/__init__.py
+touch apps/core/__init__.py
+touch apps/core/migrations/__init__.py
+touch apps/core/management/__init__.py
+touch apps/core/management/commands/__init__.py
+touch apps/core/templatetags/__init__.py
+touch apps/authentication/__init__.py
+touch apps/authentication/migrations/__init__.py
+touch apps/authentication/management/__init__.py
+touch apps/authentication/management/commands/__init__.py
+touch apps/api/__init__.py
+touch apps/api/migrations/__init__.py
+touch apps/${input:app_name}/__init__.py
+touch apps/${input:app_name}/migrations/__init__.py
+touch apps/${input:app_name}/management/__init__.py
+touch apps/${input:app_name}/management/commands/__init__.py
+touch config/__init__.py
+touch config/settings/__init__.py
+touch utils/__init__.py
+touch tests/__init__.py
+touch tests/unit/__init__.py
+touch tests/unit/core/__init__.py
+touch tests/unit/authentication/__init__.py
+touch tests/unit/api/__init__.py
+touch tests/unit/${input:app_name}/__init__.py
+touch tests/integration/__init__.py
+touch tests/integration/core/__init__.py
+touch tests/integration/authentication/__init__.py
+touch tests/integration/api/__init__.py
+touch tests/integration/${input:app_name}/__init__.py
+touch tests/factories/__init__.py
+touch tests/fixtures/__init__.py
+touch tests/mocks/__init__.py
+
+# Create additional utility files
+touch utils/validators.py
+touch utils/decorators.py
+touch utils/pagination.py
+touch utils/mixins.py
+
+# Create app configuration files
+touch apps/core/apps.py
+touch apps/authentication/apps.py
+touch apps/api/apps.py
+touch apps/${input:app_name}/apps.py
+
+# Create additional test files
+touch tests/test_settings.py
+touch tests/test_urls.py
+
+# Create deployment related files
+touch scripts/deploy.sh
+touch scripts/backup.sh
+touch scripts/migrate.sh
+
+# Create documentation files
+touch docs/API.md
+touch docs/DEPLOYMENT.md
+touch docs/CONTRIBUTING.md
+touch docs/ARCHITECTURE.md
+
+# Set proper permissions for scripts
+chmod +x scripts/*.sh
+
+# Create .keep files for empty directories that need to be tracked by git
+touch static/.keep
+touch media/.keep
+touch logs/.keep
+touch locale/.keep
+```
+
+#### Verify Critical Files Exist
+
+```bash
+# Verify all critical configuration files exist
+echo "Checking critical files..."
+for file in manage.py .env.example .gitignore .editorconfig pyproject.toml README.md; do
+    if [ ! -f "$file" ]; then
+        echo "WARNING: Missing $file - please create it"
+    fi
+done
+
+# Verify all requirements files exist
+for file in requirements/base.txt requirements/development.txt requirements/production.txt requirements/testing.txt; do
+    if [ ! -f "$file" ]; then
+        echo "WARNING: Missing $file - please create it"
+    fi
+done
+
+echo "Folder structure verification complete!"
+```
+
+### 11. Final Setup Commands
 
 Execute final setup:
 
