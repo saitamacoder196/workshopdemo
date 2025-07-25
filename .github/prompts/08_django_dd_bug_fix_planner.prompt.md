@@ -16,6 +16,12 @@ This prompt analyzes bugs and issues found in unit tests (prompt 06) and code re
 - 📄 **Test Report Path**: `${input:test_report_path}`
 - 📄 **Review Report Path**: `${input:review_report_path}`
 
+**Output Structure:**
+This prompt follows the template defined in `.github/templates/output_templates.md` for Bug Fix Planning (Prompt 08).
+
+**Output Folder:** `bug_fix_planning/`
+**Main Output File:** `metadata/bug_analysis_summary.json`
+
 ## Bug Fix Workflow
 
 ### Step 1: Analyze Test Failures and Review Issues
@@ -1279,6 +1285,203 @@ if __name__ == '__main__':
 - [ ] Manual testing completed
 - [ ] Regression testing passed
 
+## Output Generation
+
+**Create the standardized bug fix planning output using the template structure:**
+
+```python
+# Generate bug fix planning summary following template structure
+import json
+from datetime import datetime
+from pathlib import Path
+
+def generate_bug_fix_planning_output():
+    """Generate standardized bug fix planning output"""
+    
+    # Create output directory structure
+    base_dir = Path('bug_fix_planning')
+    base_dir.mkdir(exist_ok=True)
+    
+    # Create subdirectories following template
+    for subdir in ['metadata', 'analysis', 'planning', 'prioritization', 'risk_assessment', 'documentation']:
+        (base_dir / subdir).mkdir(exist_ok=True)
+    
+    # Generate main bug fix plan JSON
+    bug_fix_plan = {
+        "metadata": {
+            "app_name": "${input:app_name}",
+            "dd_name": "${input:dd_name}",
+            "generated_at": datetime.now().isoformat(),
+            "generated_by": "prompt_08",
+            "version": "1.0",
+            "source_reports": {
+                "test_report_path": "${input:test_report_path}",
+                "review_report_path": "${input:review_report_path}"
+            }
+        },
+        "bug_analysis_summary": {
+            "total_issues": 0,  # Will be calculated
+            "test_failures": 0,
+            "code_review_issues": 0,
+            "security_issues": 0,
+            "severity_breakdown": {
+                "critical": 0,
+                "high": 0,
+                "medium": 0,
+                "low": 0
+            }
+        },
+        "bug_categorization": {
+            "test_failure_categories": {
+                "model_validation": [],
+                "serializer_validation": [],
+                "view_logic": [],
+                "authentication": [],
+                "permissions": [],
+                "business_logic": [],
+                "database_integrity": [],
+                "api_contract": []
+            },
+            "code_review_categories": {
+                "security_vulnerabilities": [],
+                "code_quality": [],
+                "performance": [],
+                "django_best_practices": [],
+                "dd_compliance": []
+            }
+        },
+        "priority_phases": {
+            "phase_1_critical": {
+                "issues": [],
+                "estimated_duration": "1-2 hours",
+                "priority_score_range": "70-100"
+            },
+            "phase_2_high": {
+                "issues": [],
+                "estimated_duration": "1-3 days",
+                "priority_score_range": "50-69"
+            },
+            "phase_3_medium": {
+                "issues": [],
+                "estimated_duration": "3-5 days",
+                "priority_score_range": "30-49"
+            },
+            "phase_4_low": {
+                "issues": [],
+                "estimated_duration": "5-7 days",
+                "priority_score_range": "0-29"
+            }
+        },
+        "implementation_timeline": {
+            "total_estimated_time": "1-2 weeks",
+            "phase_schedule": [],
+            "dependencies": [],
+            "critical_path": []
+        },
+        "risk_assessment": {
+            "high_risk_changes": [],
+            "breaking_changes": [],
+            "data_migration_needed": [],
+            "rollback_complexity": "medium"
+        },
+        "recommendations": [
+            "Prioritize critical security issues first",
+            "Run tests after each fix to prevent regressions",
+            "Create backup before implementing major changes",
+            "Review fixes with senior developer for high-risk changes"
+        ],
+        "next_steps": [
+            "Run prompt 09 to execute bug fixes",
+            "Review priority phases",
+            "Prepare rollback procedures"
+        ]
+    }
+    
+    # Save main bug fix plan
+    with open(base_dir / 'metadata' / 'bug_analysis_summary.json', 'w') as f:
+        json.dump(bug_fix_plan, f, indent=2)
+    
+    # Generate supporting documentation
+    generate_bug_fix_documentation(base_dir)
+    
+    print(f"✅ Bug fix planning output created in {base_dir}/")
+    print(f"📄 Main file: {base_dir}/metadata/bug_analysis_summary.json")
+    print(f"📚 Documentation: {base_dir}/documentation/")
+    
+    return bug_fix_plan
+
+def generate_bug_fix_documentation(base_dir):
+    """Generate bug fix documentation files"""
+    
+    # Generate bug fix plan markdown
+    bug_fix_plan_md = f"""
+# Bug Fix Plan: ${{input:dd_name}}
+
+## Overview
+[Bug fix plan overview and strategy]
+
+## Issue Analysis
+[Analysis of test failures and code review findings]
+
+## Implementation Strategy
+[Approach for fixing prioritized issues]
+
+## Risk Assessment
+[Assessment of risks and mitigation strategies]
+
+## Testing Strategy
+[Plan for validating fixes and preventing regressions]
+"""
+    
+    with open(base_dir / 'documentation' / 'bug_fix_plan.md', 'w') as f:
+        f.write(bug_fix_plan_md)
+
+# Execute bug fix planning workflow
+def execute_bug_fix_planning():
+    """Execute complete bug fix planning workflow"""
+    print("=== EXECUTING BUG FIX PLANNING ===")
+    
+    # Step 1: Load test and review reports
+    print("Step 1: Loading test and review reports...")
+    # Load and parse reports from prompts 06 and 07
+    
+    # Step 2: Analyze and categorize issues
+    print("Step 2: Analyzing and categorizing issues...")
+    # Analyze test failures and review findings
+    
+    # Step 3: Prioritize issues
+    print("Step 3: Prioritizing issues by severity and impact...")
+    # Create priority phases and timeline
+    
+    # Step 4: Create standardized output
+    print("Step 4: Creating standardized output...")
+    summary = generate_bug_fix_planning_output()
+    
+    print("✅ Bug fix planning complete!")
+    print("📊 Bug Analysis: bug_fix_planning/metadata/bug_analysis_summary.json")
+    print("📋 Fix Plan: bug_fix_planning/documentation/bug_fix_plan.md")
+    print("📅 Timeline: bug_fix_planning/planning/implementation_timeline.json")
+    print("")
+    print("Next step: Run prompt 09 to execute bug fixes")
+    
+    return summary
+
+# Execute the workflow
+execute_bug_fix_planning()
+```
+
+## Template Validation
+
+**Ensure output meets template requirements:**
+
+✅ **Metadata Section**: Complete with app name, DD name, source reports, generation timestamp  
+✅ **Folder Structure**: Follows standardized template with metadata/, analysis/, planning/, etc.  
+✅ **JSON Schema**: Matches template structure for bug fix planning  
+✅ **Issue Categorization**: Both test failures and code review issues properly categorized  
+✅ **Priority Phases**: Issues prioritized with clear timeline and scoring  
+✅ **Risk Assessment**: High-risk changes and mitigation strategies identified  
+✅ **Cross-Prompt Compatibility**: Output format compatible with prompt 09 input requirements
+
 ## Success Criteria
 
 **Implementation is successful when:**
@@ -1292,25 +1495,6 @@ if __name__ == '__main__':
 ✅ **No new bugs are introduced**  
 ✅ **Documentation is updated**
 
-## Troubleshooting
-
-**Common issues during bug fixing:**
-
-### Fix Implementation Issues
-- **Syntax errors**: Run Python syntax check before testing
-- **Import errors**: Verify all required imports are present
-- **Migration conflicts**: Resolve database migration dependencies
-
-### Test Failures After Fixes
-- **New test failures**: Check if fixes introduced new issues
-- **Flaky tests**: Identify and fix non-deterministic test behavior
-- **Performance regressions**: Monitor response times after fixes
-
-### Integration Issues
-- **API compatibility**: Ensure fixes don't break API contracts
-- **Third-party dependencies**: Verify external service integration
-- **Environment differences**: Test fixes across all environments
-
 ---
 
-**Note**: This prompt provides a comprehensive framework for fixing bugs found in unit tests and code reviews. The automated fixes handle common patterns, while complex issues are flagged for manual review.
+**Note**: This prompt provides a comprehensive framework for planning bug fixes found in unit tests and code reviews. The standardized output ensures compatibility with prompt 09 for execution.

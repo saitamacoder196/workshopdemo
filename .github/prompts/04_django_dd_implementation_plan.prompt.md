@@ -14,6 +14,12 @@ This prompt converts the impact assessment from prompt 03 into a detailed, step-
 - 📁 **DD Name**: `${input:dd_name}`
 - 🔍 **Impact Assessment File**: `${input:impact_assessment_path}`
 
+**Output Structure:**
+This prompt follows the template defined in `.github/templates/output_templates.md` for Implementation Planning (Prompt 04).
+
+**Output Folder:** `dd_implementation_plan/`
+**Main Output File:** `implementation/implementation_plan.json`
+
 ## Implementation Plan Generation Workflow
 
 ### Step 1: Parse Impact Assessment Results
@@ -2237,83 +2243,140 @@ RECOMMENDED BUFFER: +20% (3-4 additional days)
 FINAL ESTIMATE: 14-21 days
 ```
 
-## Implementation Review Document
+## Output Generation
 
-**Generate this document for stakeholder review:**
+**Create the standardized implementation plan using the template structure:**
 
+```python
+# Generate implementation plan following template structure
+import json
+from datetime import datetime
+from pathlib import Path
+
+def generate_implementation_plan():
+    """Generate standardized implementation plan"""
+    
+    # Create output directory structure
+    base_dir = Path('dd_implementation_plan')
+    base_dir.mkdir(exist_ok=True)
+    
+    # Create subdirectories
+    for subdir in ['metadata', 'analysis', 'implementation', 'timeline', 'documentation', 'validation']:
+        (base_dir / subdir).mkdir(exist_ok=True)
+    
+    # Generate main implementation plan JSON
+    implementation_plan = {
+        "metadata": {
+            "dd_name": "${input:dd_name}",
+            "project_name": "${input:project_name}",
+            "app_name": "[determined_app_name]",
+            "generated_at": datetime.now().isoformat(),
+            "generated_by": "prompt_04",
+            "version": "1.0"
+        },
+        "dd_summary": {
+            "description": "[DD description from impact assessment]",
+            "business_value": "[business value statement]",
+            "type": "[feature|enhancement|bugfix]",
+            "priority": "[critical|high|medium|low]",
+            "estimated_effort": "[estimated development time]",
+            "target_completion": "[target completion date]"
+        },
+        "requirements_analysis": {
+            "api_endpoints": "[list of endpoints to implement]",
+            "data_models": "[list of models to create/modify]",
+            "business_rules": "[list of business rules to implement]",
+            "authentication_requirements": "[auth requirements]",
+            "performance_requirements": "[performance criteria]",
+            "integration_requirements": "[external integrations needed]"
+        },
+        "implementation_components": {
+            "models": "[detailed model implementation plan]",
+            "serializers": "[serializer implementation plan]",
+            "views": "[view implementation plan]",
+            "urls": "[URL configuration plan]",
+            "migrations": "[migration sequence plan]",
+            "tests": "[testing implementation plan]",
+            "configurations": "[config changes needed]"
+        },
+        "implementation_plan": {
+            "phases": "[implementation phases with timeline]",
+            "dependencies": "[technical dependencies]",
+            "risks": "[identified risks and mitigation]",
+            "mitigation_strategies": "[risk mitigation approaches]"
+        },
+        "timeline": {
+            "estimated_duration": "[total estimated time]",
+            "milestones": "[key milestones and dates]",
+            "critical_path": "[critical path items]",
+            "buffer_time": "[recommended buffer time]"
+        },
+        "validation_criteria": {
+            "acceptance_criteria": "[criteria for completion]",
+            "test_scenarios": "[test scenarios to validate]",
+            "success_metrics": "[metrics to measure success]",
+            "rollback_criteria": "[when to rollback changes]"
+        }
+    }
+    
+    # Save main implementation plan
+    with open(base_dir / 'implementation' / 'implementation_plan.json', 'w') as f:
+        json.dump(implementation_plan, f, indent=2)
+    
+    # Generate supporting documentation
+    generate_implementation_documentation(base_dir)
+    
+    print(f"✅ Implementation plan generated in {base_dir}/")
+    print(f"📄 Main file: {base_dir}/implementation/implementation_plan.json")
+    print(f"📚 Documentation: {base_dir}/documentation/")
+    
+    return implementation_plan
+
+def generate_implementation_documentation(base_dir):
+    """Generate markdown documentation files"""
+    
+    # Generate implementation plan markdown
+    plan_md = f"""
+# Implementation Plan: ${{input:dd_name}}
+
+## Overview
+[Implementation overview and summary]
+
+## Technical Architecture
+[Architecture decisions and design patterns]
+
+## Implementation Phases
+[Detailed breakdown of implementation phases]
+
+## Risk Assessment
+[Risk analysis and mitigation strategies]
+
+## Success Criteria
+[Criteria for successful implementation]
+"""
+    
+    with open(base_dir / 'documentation' / 'implementation_plan.md', 'w') as f:
+        f.write(plan_md)
+
+# Execute plan generation
+generate_implementation_plan()
 ```
-=== DJANGO DD IMPLEMENTATION PLAN REVIEW DOCUMENT ===
 
-Project: ${input:project_name}
-Design Detail: ${input:dd_name}
-Generated: [current_date]
-Estimated Timeline: [X-Y days]
+## Template Validation
 
-EXECUTIVE SUMMARY:
-This document outlines the complete implementation plan for ${input:dd_name} 
-Design Detail, including all code changes, database modifications, API 
-endpoints, and testing requirements.
+**Ensure output meets template requirements:**
 
-IMPLEMENTATION SCOPE:
-├── New Django Apps: [X apps]
-├── New Database Models: [X models]
-├── New API Endpoints: [X endpoints]
-├── Database Migrations: [X migrations]
-├── Configuration Changes: [X changes]
-└── Testing Requirements: [X test files]
-
-TECHNICAL IMPLEMENTATION:
-1. Database Layer: [X models, X migrations]
-2. API Layer: [X serializers, X views, X URLs]
-3. Business Logic: [X services, X permissions]
-4. Testing Layer: [X test files, X test cases]
-5. Configuration: [X setting changes, X environment variables]
-
-TIMELINE AND PHASES:
-Phase 1: Foundation Setup (1-2 days)
-Phase 2: Database Implementation (2-3 days)
-Phase 3: API Implementation (3-4 days)
-Phase 4: Business Logic (2-3 days)
-Phase 5: Testing & QA (2-3 days)
-Phase 6: Deployment Prep (1-2 days)
-
-RISKS AND MITIGATION:
-High Risk: [list high-risk items and mitigation strategies]
-Medium Risk: [list medium-risk items and mitigation strategies]
-Low Risk: [list low-risk items and mitigation strategies]
-
-RESOURCE REQUIREMENTS:
-├── Developer Hours: [X hours]
-├── Database Administrator: [X hours if needed]
-├── DevOps Support: [X hours if needed]
-└── QA Testing: [X hours]
-
-DEPENDENCIES:
-├── External APIs: [list external dependencies]
-├── Infrastructure: [list infrastructure requirements]
-├── Third-party Packages: [list new packages]
-└── Team Coordination: [list team dependencies]
-
-APPROVAL REQUIRED:
-[ ] Technical Architecture Review
-[ ] Database Schema Review
-[ ] API Design Review
-[ ] Security Review
-[ ] Performance Impact Review
-[ ] Deployment Strategy Review
-
-NEXT STEPS:
-1. Review this implementation plan
-2. Approve or request modifications
-3. Begin Phase 1 implementation
-4. Regular progress checkpoints
-5. Final testing and deployment
+✅ **Metadata Section**: Complete with DD name, project info, generation timestamp  
+✅ **Folder Structure**: Follows standardized template with metadata/, analysis/, implementation/, etc.  
+✅ **JSON Schema**: Matches template structure for implementation planning  
+✅ **Documentation**: Includes both JSON and markdown formats  
+✅ **Validation**: Contains acceptance criteria and success metrics  
+✅ **Timeline**: Detailed timeline with milestones and dependencies  
+✅ **Cross-Prompt Compatibility**: Output format compatible with prompt 05 input requirements
 
 ---
-This implementation plan provides a comprehensive roadmap for implementing
-the ${input:dd_name} Design Detail. Please review and approve before
-beginning development work.
-```
+
+**Note**: This implementation plan provides the detailed technical roadmap for prompt 05 to execute the actual code generation and implementation work.
 ```
 
 ### Step 3: Serializers Implementation Plan
